@@ -7,6 +7,7 @@
   </head>
   <body></body>
   <script>
+    //callback function
     function calculator(a, b, operation) {
       return operation(a, b);
     }
@@ -17,5 +18,19 @@
     console.log(calculator(5, 3, add)); // 8
     console.log(calculator(5, 3, multiply)); // 15
     console.log(calculator(5, 3, subtract)); // 2
+    //Promise
+    const checkNumber = (num) => {
+      return new Promise((resolve, reject) => {
+        if (num > 10) {
+          resolve("Data is totally right");
+        } else {
+          reject("Data is wrong");
+        }
+      });
+    };
+
+    checkNumber(11)
+      .then((res) => console.log(res))
+      .catch((err) => console.log(err));
   </script>
 </html>
