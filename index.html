@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+  </head>
+  <body></body>
+  <script>
+    function calculator(a, b, operation) {
+      return operation(a, b);
+    }
+    const add = (a, b) => a + b;
+    const multiply = (a, b) => a * b;
+    const subtract = (a, b) => a - b;
+
+    console.log(calculator(5, 3, add)); // 8
+    console.log(calculator(5, 3, multiply)); // 15
+    console.log(calculator(5, 3, subtract)); // 2
+  </script>
+</html>
