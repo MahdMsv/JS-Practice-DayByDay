@@ -8,29 +8,72 @@
   <body></body>
   <script>
     //callback function
-    function calculator(a, b, operation) {
-      return operation(a, b);
-    }
-    const add = (a, b) => a + b;
-    const multiply = (a, b) => a * b;
-    const subtract = (a, b) => a - b;
+    // function calculator(a, b, operation) {
+    //   return operation(a, b);
+    // }
+    // const add = (a, b) => a + b;
+    // const multiply = (a, b) => a * b;
+    // const subtract = (a, b) => a - b;
 
-    console.log(calculator(5, 3, add)); // 8
-    console.log(calculator(5, 3, multiply)); // 15
-    console.log(calculator(5, 3, subtract)); // 2
+    //console.log(calculator(5, 3, add));
+    //console.log(calculator(5, 3, multiply));
+    //console.log(calculator(5, 3, subtract));
     //Promise
-    const checkNumber = (num) => {
+    // const checkNumber = (num) => {
+    //   return new Promise((resolve, reject) => {
+    //     if (num > 10) {
+    //       resolve("Data is totally right");
+    //     } else {
+    //       reject("Data is wrong");
+    //     }
+    //   });
+    // };
+
+    //checkNumber(20)
+    //  .then((data) => console.log(data))
+    //  .catch((err) => console.log(err));
+
+    //async & await
+    const products = [
+      {
+        id: 1,
+        name: "Laptop",
+        price: 1450,
+      },
+      {
+        id: 2,
+        name: "Phone",
+        price: 800,
+      },
+      {
+        id: 3,
+        name: "Keyboard",
+        price: 120,
+      },
+    ];
+
+    const getProduct = (id) => {
       return new Promise((resolve, reject) => {
-        if (num > 10) {
-          resolve("Data is totally right");
+        const product = products.find((product) => product.id === id);
+
+        if (product) {
+          resolve(product);
         } else {
-          reject("Data is wrong");
+          reject("Not found");
         }
       });
     };
 
-    checkNumber(20)
-      .then((result) => console.log(result))
-      .catch((error) => console.log(error));
+    async function showProduct() {
+      try {
+        const result = await getProduct(1);
+
+        console.log(result);
+      } catch (error) {
+        console.log(error);
+      }
+    }
+
+    showProduct();
   </script>
 </html>
