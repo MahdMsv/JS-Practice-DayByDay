@@ -34,46 +34,47 @@
     //  .catch((err) => console.log(err));
 
     //async & await
-    const products = [
-      {
-        id: 1,
-        name: "Laptop",
-        price: 1450,
-      },
-      {
-        id: 2,
-        name: "Phone",
-        price: 800,
-      },
-      {
-        id: 3,
-        name: "Keyboard",
-        price: 120,
-      },
-    ];
+    // const products = [
+    //   {
+    //     id: 1,
+    //     name: "Laptop",
+    //     price: 1450,
+    //   },
+    //   {
+    //     id: 2,
+    //     name: "Phone",
+    //     price: 800,
+    //   },
+    //   {
+    //     id: 3,
+    //     name: "Keyboard",
+    //     price: 120,
+    //   },
+    // ];
 
-    const getProduct = (id) => {
-      return new Promise((resolve, reject) => {
-        const product = products.find((product) => product.id === id);
+    // const getProduct = (id) => {
+    //   return new Promise((resolve, reject) => {
+    //     const product = products.find((product) => product.id === id);
 
-        if (product) {
-          resolve(product);
-        } else {
-          reject("Not found");
-        }
-      });
-    };
+    //     if (product) {
+    //       resolve(product);
+    //     } else {
+    //       reject("Not found");
+    //     }
+    //   });
+    // };
 
-    async function showProduct() {
-      try {
-        const result = await getProduct(1);
+    // async function showProduct() {
+    //   try {
+    //     const result = await getProduct(1);
 
-        console.log(result);
-      } catch (error) {
-        console.log(error);
-      }
-    }
+    //     console.log(result);
+    //   } catch (error) {
+    //     console.log(error);
+    //   }
+    // }
+    // showProduct();
 
-    showProduct();
+    //closure
   </script>
 </html>
