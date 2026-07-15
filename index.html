@@ -76,5 +76,28 @@
     // showProduct();
 
     //closure
+    function createBankAccount(initialBalance) {
+      let balance = initialBalance;
+
+      return {
+        deposit(amount) {
+          balance = balance + amount;
+          console.log(balance);
+        },
+        withdraw(amount) {
+          balance = balance - amount;
+          console.log(balance);
+        },
+        getBalance() {
+          console.log(balance);
+        },
+      };
+    }
+
+    const account = createBankAccount(1000);
+
+    account.deposit(500);
+    account.withdraw(157);
+    account.getBalance();
   </script>
 </html>
