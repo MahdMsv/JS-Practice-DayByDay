@@ -11,9 +11,13 @@
     <!-- <button id="load">Load Posts</button>
     <ul id="list"></ul> -->
 
-    <input id="input" type="text" />
+    <!-- <input id="input" type="text" />
     <button id="show">Show</button>
-    <p id="result"></p>
+    <p id="result"></p> -->
+
+    <input id="input" type="text" />
+    <button id="add">Add</button>
+    <ul id="list"></ul>
   </body>
   <script>
     //callback function
@@ -190,12 +194,22 @@
     //   }
     // });
 
-    const btn = document.getElementById("show");
-    const input = document.getElementById("input");
-    const result = document.getElementById("result");
+    // const btn = document.getElementById("show");
+    // const input = document.getElementById("input");
+    // const result = document.getElementById("result");
+    // btn.addEventListener("click", function () {
+    //   result.textContent = input.value;
+    //   if (input.value === "") return;
+    // });
+
+    const inp = document.getElementById("input");
+    const btn = document.getElementById("add");
+    const ul = document.getElementById("list");
     btn.addEventListener("click", function () {
-      result.textContent = input.value;
-      if (input.value === "") return;
+      const li = document.createElement("li");
+      li.textContent = inp.value;
+      ul.appendChild(li);
+      input.value = "";
     });
   </script>
 </html>
