@@ -15,9 +15,14 @@
     <button id="show">Show</button>
     <p id="result"></p> -->
 
+    <!-- <input id="input" type="text" />
+    <button id="add">Add</button>
+    <ul id="list"></ul> -->
+
+    <ul id="list"></ul>
+
     <input id="input" type="text" />
     <button id="add">Add</button>
-    <ul id="list"></ul>
   </body>
   <script>
     //callback function
@@ -202,12 +207,30 @@
     //   if (input.value === "") return;
     // });
 
-    const inp = document.getElementById("input");
-    const btn = document.getElementById("add");
+    // const inp = document.getElementById("input");
+    // const btn = document.getElementById("add");
+    // const ul = document.getElementById("list");
+    // btn.addEventListener("click", function () {
+    //   const li = document.createElement("li");
+    //   li.textContent = inp.value;
+    //   ul.appendChild(li);
+    //   input.value = "";
+    // });
+
+    const input = document.getElementById("input");
+    const button = document.getElementById("add");
     const ul = document.getElementById("list");
-    btn.addEventListener("click", function () {
+
+    button.addEventListener("click", function () {
+      if (input.value === "") return;
+
       const li = document.createElement("li");
-      li.textContent = inp.value;
+      li.textContent = input.value;
+
+      li.addEventListener("click", function () {
+        li.remove();
+      });
+
       ul.appendChild(li);
       input.value = "";
     });
