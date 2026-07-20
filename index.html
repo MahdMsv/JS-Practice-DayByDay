@@ -24,10 +24,17 @@
     <input id="input" type="text" />
     <button id="add">Add</button> -->
 
-    <ul id="ul">
-      <li><button class="delete-btn">delete-btn</button></li>
-      <li><button class="delete-btn">delete-btn</button></li>
-      <li><button class="delete-btn">delete-btn</button></li>
+    <ul id="post-list">
+      <li>
+        <span>پست شماره ۱</span>
+        <button class="btn-like">❤️ <span class="like-count">0</span></button>
+        <button class="btn-delete">🗑️ حذف</button>
+      </li>
+      <li>
+        <span>پست شماره ۲</span>
+        <button class="btn-like">❤️ <span class="like-count">0</span></button>
+        <button class="btn-delete">🗑️ حذف</button>
+      </li>
     </ul>
   </body>
   <script>
@@ -241,12 +248,10 @@
     //   input.value = "";
     // });
 
-    const ul = document.getElementById("ul");
+    const ul = document.getElementById("post-list");
     ul.addEventListener("click", function (e) {
-      if (e.target.classList.contains("delete-btn")) {
-        const li = e.target.closest("li");
-        li.remove();
-        console.log("removed item");
+      if (e.target.classList.contains("btn-delete")) {
+        ul.remove();
       }
     });
   </script>
