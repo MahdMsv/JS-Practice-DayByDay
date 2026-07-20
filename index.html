@@ -19,10 +19,16 @@
     <button id="add">Add</button>
     <ul id="list"></ul> -->
 
-    <ul id="list"></ul>
+    <!-- <ul id="list"></ul>
 
     <input id="input" type="text" />
-    <button id="add">Add</button>
+    <button id="add">Add</button> -->
+
+    <ul id="ul">
+      <li><button class="delete-btn">delete-btn</button></li>
+      <li><button class="delete-btn">delete-btn</button></li>
+      <li><button class="delete-btn">delete-btn</button></li>
+    </ul>
   </body>
   <script>
     //callback function
@@ -217,22 +223,31 @@
     //   input.value = "";
     // });
 
-    const input = document.getElementById("input");
-    const button = document.getElementById("add");
-    const ul = document.getElementById("list");
+    // const input = document.getElementById("input");
+    // const button = document.getElementById("add");
+    // const ul = document.getElementById("list");
 
-    button.addEventListener("click", function () {
-      if (input.value === "") return;
+    // button.addEventListener("click", function () {
+    //   if (input.value === "") return;
 
-      const li = document.createElement("li");
-      li.textContent = input.value;
+    //   const li = document.createElement("li");
+    //   li.textContent = input.value;
 
-      li.addEventListener("click", function () {
+    //   li.addEventListener("click", function () {
+    //     li.remove();
+    //   });
+
+    //   ul.appendChild(li);
+    //   input.value = "";
+    // });
+
+    const ul = document.getElementById("ul");
+    ul.addEventListener("click", function (e) {
+      if (e.target.classList.contains("delete-btn")) {
+        const li = e.target.closest("li");
         li.remove();
-      });
-
-      ul.appendChild(li);
-      input.value = "";
+        console.log("removed item");
+      }
     });
   </script>
 </html>
