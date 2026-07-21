@@ -36,6 +36,9 @@
         <button class="btn-delete">🗑️ حذف</button>
       </li>
     </ul> -->
+
+    <input id="input" type="text" placeholder="type something..." />
+    <ul id="list"></ul>
   </body>
   <script>
     //callback function
@@ -254,5 +257,24 @@
     //     ul.remove();
     //   }
     // });
+
+    const ul = document.getElementById("list");
+    const input = document.getElementById("input");
+    input.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") {
+        if (input.value === "") return;
+        const li = document.createElement("li");
+        li.textContent = input.value;
+        ul.appendChild(li);
+        input.value = "";
+      }
+    });
+    input.addEventListener("input", function () {
+      if (input.value.trim().length > 10) {
+        input.style.backgroundColor = "red";
+      } else {
+        input.style.backgroundColor = "white";
+      }
+    });
   </script>
 </html>
