@@ -258,6 +258,7 @@
     //   }
     // });
 
+    //keyEvents
     const ul = document.getElementById("list");
     const input = document.getElementById("input");
     input.addEventListener("keydown", function (e) {
@@ -270,10 +271,8 @@
       }
     });
     input.addEventListener("input", function () {
-      if (input.value.trim().length > 10) {
-        input.style.backgroundColor = "red";
-      } else {
-        input.style.backgroundColor = "white";
+      if (input.value.length > 10) {
+        input.value = input.value.slice(0, 10);
       }
     });
   </script>
