@@ -37,7 +37,14 @@
       </li>
     </ul> -->
 
-    <input id="input" type="text" placeholder="type something..." />
+    <!-- <input id="input" type="text" placeholder="type something..." />
+    <ul id="list"></ul> -->
+
+    <form id="form">
+      <input id="input" type="text" />
+      <button type="submit">Add</button>
+    </form>
+
     <ul id="list"></ul>
   </body>
   <script>
@@ -259,21 +266,39 @@
     // });
 
     //keyEvents
-    const ul = document.getElementById("list");
+    // const ul = document.getElementById("list");
+    // const input = document.getElementById("input");
+    // input.addEventListener("keydown", function (e) {
+    //   if (e.key === "Enter") {
+    //     if (input.value === "") return;
+    //     const li = document.createElement("li");
+    //     li.textContent = input.value;
+    //     ul.appendChild(li);
+    //     input.value = "";
+    //   }
+    // });
+    // input.addEventListener("input", function () {
+    //   if (input.value.length > 10) {
+    //     input.value = input.value.slice(0, 10);
+    //   }
+    // });
+
+    //FormHandling
+    const form = document.getElementById("form");
     const input = document.getElementById("input");
-    input.addEventListener("keydown", function (e) {
-      if (e.key === "Enter") {
-        if (input.value === "") return;
-        const li = document.createElement("li");
-        li.textContent = input.value;
-        ul.appendChild(li);
-        input.value = "";
-      }
+    const ul = document.getElementById("list");
+
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+
+      const li = document.createElement("li");
+      li.textContent = input.value;
+      ul.appendChild(li);
+      input.value = "";
+      input.style.backgroundColor = "";
     });
-    input.addEventListener("input", function () {
-      if (input.value.length > 10) {
-        input.value = input.value.slice(0, 10);
-      }
-    });
+    if (input.value.trim() === "") {
+      input.style.backgroundColor = "red";
+    }
   </script>
 </html>
