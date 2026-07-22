@@ -46,6 +46,7 @@
     </form>
 
     <ul id="list"></ul>
+    <p id="count">Items: 0</p>
   </body>
   <script>
     //callback function
@@ -287,13 +288,17 @@
     const form = document.getElementById("form");
     const input = document.getElementById("input");
     const ul = document.getElementById("list");
-
+    const count = document.getElementById("count");
+    function updateCount() {
+      count.textContent = `Items: ${ul.children.length}`;
+    }
     form.addEventListener("submit", function (e) {
       e.preventDefault();
 
       const li = document.createElement("li");
       li.textContent = input.value;
       ul.appendChild(li);
+      updateCount();
       input.value = "";
       input.style.backgroundColor = "";
     });
