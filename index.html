@@ -5,15 +5,59 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Document</title>
   </head>
-  <body></body>
-  <script>
-    const user = {
-      name: "Ali",
-      sayName() {
-        console.log(this.name);
-      },
-    };
+  <body>
+    <form id="form">
+      <input id="input" type="text" placeholder="Add item..." />
+      <button type="submit">Add</button>
+    </form>
 
-    user.sayName(); // Ali
+    <!-- لیست -->
+    <ul id="list"></ul>
+  </body>
+  <script>
+    // this keyword
+    // const user = {
+    //   name: "Ali",
+    //   sayName() {
+    //     console.log(this.name);
+    //   },
+    // };
+
+    // user.sayName();
+
+    //LocalStorage
+    const form = document.getElementById("form");
+    const input = document.getElementById("input");
+    const ul = document.getElementById("list");
+
+    let items = JSON.parse(localStorage.getItem("items")) || [];
+
+    items.forEach(function (item) {
+      const li = document.createElement("li");
+      li.textContent = item;
+      ul.appendChild(li);
+    });
+
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+
+      const value = input.value.trim();
+
+      if (value === "") {
+        input.style.border = "2px solid red";
+        return;
+      }
+
+      items.push(value);
+
+      localStorage.setItem("items", JSON.stringify(items));
+
+      const li = document.createElement("li");
+      li.textContent = value;
+      ul.appendChild(li);
+
+      input.value = "";
+      input.style.border = "";
+    });
   </script>
 </html>
