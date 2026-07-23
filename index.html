@@ -6,12 +6,13 @@
     <title>Document</title>
   </head>
   <body>
+    <h2>Todo List</h2>
+
     <form id="form">
       <input id="input" type="text" placeholder="Add item..." />
       <button type="submit">Add</button>
     </form>
 
-    <!-- لیست -->
     <ul id="list"></ul>
   </body>
   <script>
@@ -32,10 +33,32 @@
 
     let items = JSON.parse(localStorage.getItem("items")) || [];
 
-    items.forEach(function (item) {
+    function createItem(item) {
       const li = document.createElement("li");
-      li.textContent = item;
+
+      const span = document.createElement("span");
+      span.textContent = item.text;
+
+      const btn = document.createElement("button");
+      btn.textContent = "❌";
+
+      btn.addEventListener("click", function () {
+        li.remove();
+
+        items = items.filter(function (i) {
+          return i.id !== item.id;
+        });
+
+        localStorage.setItem("items", JSON.stringify(items));
+      });
+
+      li.appendChild(span);
+      li.appendChild(btn);
       ul.appendChild(li);
+    }
+
+    items.forEach(function (item) {
+      createItem(item);
     });
 
     form.addEventListener("submit", function (e) {
@@ -48,13 +71,16 @@
         return;
       }
 
-      items.push(value);
+      const newItem = {
+        id: Date.now(),
+        text: value,
+      };
+
+      items.push(newItem);
 
       localStorage.setItem("items", JSON.stringify(items));
 
-      const li = document.createElement("li");
-      li.textContent = value;
-      ul.appendChild(li);
+      createItem(newItem);
 
       input.value = "";
       input.style.border = "";
