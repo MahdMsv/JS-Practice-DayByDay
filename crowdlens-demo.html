@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CrowdLens — Live Crowd Intelligence (Demo)</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          base: '#0B1220',
+          panel: '#121A2B',
+          panel2: '#16203A',
+          hair: '#243050',
+          ink: '#E7ECF5',
+          mute: '#8C99B4',
+          brand: '#22D3C0',
+          brand2: '#7C6FF0',
+          low: '#34D399',
+          medium: '#FBBF24',
+          high: '#F87171',
+        },
+        fontFamily: {
+          display: ['"Space Grotesk"', 'sans-serif'],
+          body: ['Inter', 'sans-serif'],
+          mono: ['"IBM Plex Mono"', 'monospace'],
+        }
+      }
+    }
+  }
+</script>
+
+<script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+
+<style>
+  html, body { background: #0B1220; }
+  * { box-sizing: border-box; }
+
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #243050; border-radius: 4px; }
+
+  @keyframes pulseRing {
+    0%   { transform: scale(0.9); opacity: .9; }
+    70%  { transform: scale(2.2); opacity: 0; }
+    100% { transform: scale(2.2); opacity: 0; }
+  }
+  .pulse-ring::before {
+    content: '';
+    position: absolute; inset: 0;
+    border-radius: 9999px;
+    background: currentColor;
+    animation: pulseRing 2.2s cubic-bezier(.4,0,.6,1) infinite;
+  }
+
+  @keyframes scanline {
+    0%   { top: 0%; }
+    100% { top: 100%; }
+  }
+  .scanline::after {
+    content: '';
+    position: absolute; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, #22D3C0, transparent);
+    box-shadow: 0 0 10px 1px rgba(34,211,192,.8);
+    animation: scanline 1.8s linear infinite;
+  }
+
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .fade-in-up { animation: fadeInUp .35s ease both; }
+
+  @keyframes boxIn {
+    from { opacity: 0; transform: scale(.85); }
+    to   { opacity: 1; transform: scale(1); }
+  }
+  .box-in { animation: boxIn .3s ease both; }
+
+  @keyframes flashPin {
+    0%, 100% { filter: brightness(1); }
+    50% { filter: brightness(1.9); }
+  }
+  .flash { animation: flashPin .7s ease; }
+
+  .grain {
+    background-image: radial-gradient(rgba(255,255,255,0.035) 1px, transparent 1px);
+    background-size: 3px 3px;
+  }
+
+  .toast-in { animation: fadeInUp .25s ease both; }
+</style>
+</head>
+<body class="bg-base text-ink font-body min-h-screen">
+
+<div id="root"></div>
+
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useRef, useMemo, useCallback } = React;
+
+/* ============================== CONSTANTS ============================== */
+
+const CATEGORY_META = {
+  cafe:       { label: 'Café',       icon: '☕' },
+  restaurant: { label: 'Restaurant', icon: '🍽️' },
+  metro:      { label: 'Metro',      icon: '🚇' },
+  bank:       { label: 'Bank',       icon: '🏦' },
+  store:      { label: 'Store',      icon: '🛍️' },
+  office:     { label: 'Office',     icon: '🏢' },
+};
+
+const STATUS = {
+  low:    { color: '#34D399', label: 'Low' },
+  medium: { color: '#FBBF24', label: 'Medium' },
+  high:   { color: '#F87171', label: 'High' },
+};
+
+function scoreCategory(score) {
+  if (score >= 67) return 'high';
+  if (score >= 34) return 'medium';
+  return 'low';
+}
+
+function clamp(n, min, max) { return Math.max(min, Math.min(max, n)); }
+function uid() { return Math.random().toString(36).slice(2, 10); }
+
+function waitFromScore(score, category) {
+  const base = { cafe: 0.06, restaurant: 0.09, metro: 0.02, bank: 0.14, store: 0.03, office: 0.02 }[category] ?? 0.06;
+  return Math.round(score * base * 10) / 10;
+}
+
+function queueFromScore(score) {
+  return Math.round((score / 100) * 18);
+}
+
+const PIPELINE_STAGES = [
+  { key: 'upload', label: 'Uploading video',        detail: 'Transferring 8s clip to secure storage' },
+  { key: 'blur',   label: 'Face blurring pass',     detail: 'Detecting & irreversibly redacting faces before anything is stored' },
+  { key: 'yolo',   label: 'YOLO person detection',  detail: 'Running YOLOv8 across sampled frames' },
+  { key: 'wait',   label: 'Wait-time calculation',  detail: 'Estimating queue length & service speed (XGBoost)' },
+  { key: 'score',  label: 'Crowd score updated',    detail: 'Publishing live score to the map' },
+];
+
+const BADGE_DEFS = [
+  { id: 'first_report',    label: 'First Report',        icon: '🎯', desc: 'Submitted your first crowd report' },
+  { id: 'trusted',         label: 'Trusted Reporter',    icon: '🛡️', desc: 'Accuracy score above 70' },
+  { id: 'cafe_regular',    label: 'Café Regular',        icon: '☕', desc: '5+ reports at cafés' },
+  { id: 'bank_beat',       label: 'Bank Beat',           icon: '🏦', desc: 'Reported crowd status at a bank' },
+  { id: 'rush_hour_hero',  label: 'Rush Hour Hero',      icon: '⚡', desc: 'Reported twice in one session' },
+  { id: 'night_owl',       label: 'Night Owl',           icon: '🌙', desc: 'Reported after 11pm' },
+];
+
+function levelFromPoints(points) { return Math.floor(Math.sqrt(points / 50)) + 1; }
+function levelFloor(level) { return 50 * Math.pow(level - 1, 2); }
+function levelCeil(level) { return 50 * Math.pow(level, 2); }
+
+/* ============================== SEED DATA ============================== */
+
+function hourlyPattern(kind) {
+  const curves = {
+    cafe:       [4,3,2,2,3,10,28,55,62,48,35,42,58,50,38,30,26,32,44,40,28,18,10,6],
+    bank:       [0,0,0,0,0,0,0,15,40,55,60,68,72,66,58,62,70,45,0,0,0,0,0,0],
+    restaurant: [3,2,1,1,2,4,8,14,20,24,28,50,78,62,30,22,20,26,55,80,70,45,22,10],
+  };
+  return curves[kind] || curves.cafe;
+}
+
+const INITIAL_VENUES = [
+  { id: 'v1',  name: 'Café de Flore',        category: 'cafe',       x: 22, y: 34, score: 58, business: true,  hourly: hourlyPattern('cafe') },
+  { id: 'v2',  name: 'Nord Express Metro',   category: 'metro',      x: 48, y: 22, score: 74, business: false },
+  { id: 'v3',  name: 'Republique Bank',      category: 'bank',       x: 63, y: 40, score: 81, business: true,  hourly: hourlyPattern('bank') },
+  { id: 'v4',  name: 'Trattoria Bellini',    category: 'restaurant', x: 34, y: 58, score: 45, business: true,  hourly: hourlyPattern('restaurant') },
+  { id: 'v5',  name: 'Marché Fresh Store',   category: 'store',      x: 76, y: 62, score: 29, business: false },
+  { id: 'v6',  name: 'Lumen Coworking',      category: 'office',     x: 58, y: 72, score: 20, business: false },
+  { id: 'v7',  name: 'Central Line Station', category: 'metro',      x: 15, y: 68, score: 62, business: false },
+  { id: 'v8',  name: 'Café Bonjour',         category: 'cafe',       x: 84, y: 30, score: 35, business: false },
+  { id: 'v9',  name: 'Southside Bank',       category: 'bank',       x: 40, y: 84, score: 24, business: false },
+  { id: 'v10', name: 'Bistro Lumière',       category: 'restaurant', x: 70, y: 18, score: 66, business: false },
+  { id: 'v11', name: 'QuickMart',            category: 'store',      x: 12, y: 46, score: 51, business: false },
+  { id: 'v12', name: 'Atlas Business Park',  category: 'office',     x: 90, y: 78, score: 12, business: false },
+].map(v => ({
+  ...v,
+  minsAgo: Math.floor(Math.random() * 20),
+  history: Array.from({ length: 6 }, () => clamp(v.score + Math.round((Math.random() - 0.5) * 30), 2, 98)),
+}));
+
+/* ============================== SMALL UI PRIMITIVES ============================== */
+
+function ScanFrame({ children, className = '', tone = 'brand' }) {
+  const c = tone === 'brand' ? 'border-brand/70' : 'border-mute/40';
+  return (
+    <div className={`relative ${className}`}>
+      <span className={`absolute -top-px -left-px w-3 h-3 border-t-2 border-l-2 ${c} pointer-events-none`}></span>
+      <span className={`absolute -top-px -right-px w-3 h-3 border-t-2 border-r-2 ${c} pointer-events-none`}></span>
+      <span className={`absolute -bottom-px -left-px w-3 h-3 border-b-2 border-l-2 ${c} pointer-events-none`}></span>
+      <span className={`absolute -bottom-px -right-px w-3 h-3 border-b-2 border-r-2 ${c} pointer-events-none`}></span>
+      {children}
+    </div>
+  );
+}
+
+function StatusDot({ category, size = 8 }) {
+  return <span style={{ width: size, height: size, background: STATUS[category].color }} className="inline-block rounded-full"></span>;
+}
+
+function StatusPill({ category }) {
+  const s = STATUS[category];
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-mono font-medium tracking-wide"
+      style={{ background: `${s.color}1A`, color: s.color, border: `1px solid ${s.color}55` }}
+    >
+      <StatusDot category={category} size={6} /> {s.label.toUpperCase()}
+    </span>
+  );
+}
+
+function Sparkline({ data, color }) {
+  const w = 100, h = 28, pad = 2;
+  const max = Math.max(...data, 1), min = Math.min(...data, 0);
+  const pts = data.map((d, i) => {
+    const x = pad + (i / (data.length - 1)) * (w - pad * 2);
+    const y = h - pad - ((d - min) / (max - min || 1)) * (h - pad * 2);
+    return `${x},${y}`;
+  }).join(' ');
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-7">
+      <polyline points={pts} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/* ============================== SCHEMATIC MAP BACKGROUND ============================== */
+
+function SchematicMapBackground() {
+  return (
+    <svg viewBox="0 0 1000 600" className="absolute inset-0 w-full h-full" preserveAspectRatio="none">
+      <defs>
+        <linearGradient id="riverGrad" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#22D3C0" stopOpacity="0.18" />
+          <stop offset="100%" stopColor="#22D3C0" stopOpacity="0.05" />
+        </linearGradient>
+      </defs>
+      <rect width="1000" height="600" fill="#0E1728" />
+      {Array.from({ length: 11 }).map((_, i) => (
+        <line key={'h'+i} x1="0" y1={i * 60} x2="1000" y2={i * 60} stroke="#1B2740" strokeWidth="1" />
+      ))}
+      {Array.from({ length: 17 }).map((_, i) => (
+        <line key={'v'+i} x1={i * 62.5} y1="0" x2={i * 62.5} y2="600" stroke="#1B2740" strokeWidth="1" />
+      ))}
+      <path d="M -20 420 C 200 380, 320 470, 480 420 C 650 370, 780 460, 1020 410"
+            stroke="url(#riverGrad)" strokeWidth="46" fill="none" />
+      <rect x="640" y="60" width="220" height="150" rx="6" fill="#16351f" opacity="0.35" />
+      <rect x="60" y="230" width="150" height="120" rx="6" fill="#16351f" opacity="0.25" />
+      <path d="M 0 90 L 1000 190" stroke="#233255" strokeWidth="2.5" opacity="0.6" />
+      <path d="M 120 0 L 780 600" stroke="#233255" strokeWidth="2.5" opacity="0.6" />
+      <path d="M 1000 300 L 300 600" stroke="#233255" strokeWidth="2.5" opacity="0.6" />
+    </svg>
+  );
+}
+
+/* ============================== MAP PIN ============================== */
+
+function Pin({ venue, selected, onSelect, flash }) {
+  const cat = scoreCategory(venue.score);
+  const color = STATUS[cat].color;
+  const stale = venue.minsAgo > 60;
+  const aging = venue.minsAgo > 15 && venue.minsAgo <= 60;
+
+  return (
+    <button
+      onClick={() => onSelect(venue.id)}
+      style={{ left: `${venue.x}%`, top: `${venue.y}%`, color }}
+      className={`group absolute -translate-x-1/2 -translate-y-1/2 z-10 ${flash ? 'flash' : ''}`}
+      title={venue.name}
+    >
+      <span className="relative flex items-center justify-center w-4 h-4">
+        {!stale && <span className="pulse-ring absolute inset-0 opacity-60"></span>}
+        <span
+          className="relative w-3.5 h-3.5 rounded-full border-2 border-base shadow-lg"
+          style={{ background: color, opacity: stale ? 0.35 : aging ? 0.65 : 1 }}
+        ></span>
+      </span>
+      <span
+        className={`absolute left-1/2 -translate-x-1/2 top-5 whitespace-nowrap px-2 py-0.5 rounded text-[11px] font-mono bg-panel2/95 border border-hair
+          ${selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity pointer-events-none`}
+      >
+        {venue.name} · {Math.round(venue.score)}
+      </span>
+      {selected && (
+        <span className="absolute left-1/2 -translate-x-1/2 -top-2 w-8 h-8 rounded-full border-2 border-brand/80 -z-10"></span>
+      )}
+    </button>
+  );
+}
+
+/* ============================== VENUE DETAIL PANEL ============================== */
+
+function VenueDetail({ venue, onClose, onReportHere }) {
+  if (!venue) return null;
+  const cat = scoreCategory(venue.score);
+  const wait = waitFromScore(venue.score, venue.category);
+  const queue = queueFromScore(venue.score);
+
+  return (
+    <div className="fade-in-up w-full md:w-80 shrink-0 bg-panel border border-hair rounded-lg p-4 flex flex-col gap-4">
+      <ScanFrame className="pb-3 border-b border-hair">
+        <div className="flex items-start justify-between gap-2 pb-1">
+          <div>
+            <div className="text-[11px] text-mute font-mono uppercase tracking-wider">
+              {CATEGORY_META[venue.category].icon} {CATEGORY_META[venue.category].label}
+              {venue.business && <span className="ml-2 px-1.5 py-0.5 rounded bg-brand2/15 text-brand2 border border-brand2/30">Claimed</span>}
+            </div>
+            <div className="font-display text-lg font-semibold leading-tight mt-0.5">{venue.name}</div>
+          </div>
+          <button onClick={onClose} className="text-mute hover:text-ink text-sm">✕</button>
+        </div>
+      </ScanFrame>
+
+      <div className="flex items-center gap-4">
+        <div className="font-mono text-4xl font-semibold" style={{ color: STATUS[cat].color }}>
+          {Math.round(venue.score)}
+        </div>
+        <div className="flex flex-col gap-1">
+          <StatusPill category={cat} />
+          <span className="text-[11px] text-mute font-mono">
+            {venue.minsAgo === 0 ? 'updated just now' : `updated ${venue.minsAgo}m ago`}
+            {venue.minsAgo > 60 && ' · no recent reports'}
+          </span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div className="bg-panel2 border border-hair rounded-md p-2.5">
+          <div className="text-[11px] text-mute">Queue length</div>
+          <div className="font-mono text-lg">{queue} people</div>
+        </div>
+        <div className="bg-panel2 border border-hair rounded-md p-2.5">
+          <div className="text-[11px] text-mute">Est. wait</div>
+          <div className="font-mono text-lg">{wait} min</div>
+        </div>
+      </div>
+
+      <div>
+        <div className="text-[11px] text-mute mb-1">Last 6 reports</div>
+        <Sparkline data={venue.history} color={STATUS[cat].color} />
+      </div>
+
+      <button
+        onClick={() => onReportHere(venue.id)}
+        className="mt-auto w-full bg-brand text-base font-semibold text-sm py-2 rounded-md hover:brightness-110 transition"
+      >
+        + Report crowd here
+      </button>
+    </div>
+  );
+}
+
+/* ============================== MAP VIEW ============================== */
+
+function MapView({ venues, onReport }) {
+  const [selectedId, setSelectedId] = useState(null);
+  const [filter, setFilter] = useState('all');
+  const [flashId, setFlashId] = useState(null);
+
+  useEffect(() => {
+    if (!flashId) return;
+    const t = setTimeout(() => setFlashId(null), 700);
+    return () => clearTimeout(t);
+  }, [flashId]);
+
+  // expose a way for parent live-tick to trigger flash (via custom event) - simplest: watch venues change
+  const prevScores = useRef({});
+  useEffect(() => {
+    venues.forEach(v => {
+      if (prevScores.current[v.id] !== undefined && prevScores.current[v.id] !== v.score) {
+        setFlashId(v.id);
+      }
+      prevScores.current[v.id] = v.score;
+    });
+  }, [venues]);
+
+  const visible = filter === 'all' ? venues : venues.filter(v => v.category === filter);
+  const selected = venues.find(v => v.id === selectedId) || null;
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-wrap gap-2">
+        {['all', ...Object.keys(CATEGORY_META)].map(key => (
+          <button
+            key={key}
+            onClick={() => setFilter(key)}
+            className={`px-3 py-1.5 rounded-md text-xs font-medium border transition
+              ${filter === key ? 'bg-brand/15 border-brand text-brand' : 'bg-panel border-hair text-mute hover:text-ink'}`}
+          >
+            {key === 'all' ? 'All venues' : `${CATEGORY_META[key].icon} ${CATEGORY_META[key].label}`}
+          </button>
+        ))}
+        <div className="ml-auto flex items-center gap-3 text-[11px] font-mono text-mute px-1">
+          <span className="flex items-center gap-1"><StatusDot category="low" /> Low</span>
+          <span className="flex items-center gap-1"><StatusDot category="medium" /> Medium</span>
+          <span className="flex items-center gap-1"><StatusDot category="high" /> High</span>
+        </div>
+      </div>
+
+      <div className="flex flex-col md:flex-row gap-3">
+        <div className="relative flex-1 min-h-[420px] rounded-lg overflow-hidden border border-hair grain">
+          <SchematicMapBackground />
+          {visible.map(v => (
+            <Pin key={v.id} venue={v} selected={v.id === selectedId} onSelect={setSelectedId} flash={flashId === v.id} />
+          ))}
+          <div className="absolute bottom-2 left-2 text-[10px] font-mono text-mute/70 bg-base/60 px-1.5 py-0.5 rounded">
+            Demo City — schematic layout, not real geography
+          </div>
+          <div className="absolute top-2 right-2 text-[10px] font-mono text-brand/80 bg-base/60 px-2 py-1 rounded flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-brand text-brand pulse-ring relative"></span> LIVE
+          </div>
+        </div>
+
+        {selected ? (
+          <VenueDetail venue={selected} onClose={() => setSelectedId(null)} onReportHere={onReport} />
+        ) : (
+          <div className="w-full md:w-80 shrink-0 border border-dashed border-hair rounded-lg p-6 flex flex-col items-center justify-center text-center text-mute text-sm gap-2">
+            <span className="text-2xl">📍</span>
+            Select a pin to see live crowd detail, or tap “Report crowd” to simulate an upload.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ============================== UPLOAD MODAL ============================== */
+
+function DetectionBoxes() {
+  const boxes = useMemo(() => Array.from({ length: 4 + Math.floor(Math.random() * 3) }, () => ({
+    id: uid(),
+    x: 8 + Math.random() * 70,
+    y: 15 + Math.random() * 55,
+    w: 8 + Math.random() * 10,
+    h: 14 + Math.random() * 16,
+    delay: Math.random() * 0.6,
+  })), []);
+  return (
+    <>
+      {boxes.map(b => (
+        <div
+          key={b.id}
+          className="box-in absolute border-2 border-brand rounded-sm"
+          style={{ left: `${b.x}%`, top: `${b.y}%`, width: `${b.w}%`, height: `${b.h}%`, animationDelay: `${b.delay}s` }}
+        >
+          <span className="absolute -top-4 left-0 text-[9px] font-mono text-brand bg-base/80 px-1 rounded">person .9{Math.floor(Math.random()*9)}</span>
+        </div>
+      ))}
+    </>
+  );
+}
+
+function UploadModal({ venues, prefillId, onClose, onComplete }) {
+  const [venueId, setVenueId] = useState(prefillId || venues[0].id);
+  const [phase, setPhase] = useState('form'); // form | processing | result
+  const [stageIdx, setStageIdx] = useState(0);
+  const [result, setResult] = useState(null);
+  const venue = venues.find(v => v.id === venueId);
+
+  useEffect(() => {
+    if (phase !== 'processing') return;
+    if (stageIdx >= PIPELINE_STAGES.length) {
+      const t = setTimeout(() => {
+        const newScore = clamp(Math.round(venue.score * 0.5 + (20 + Math.random() * 60) * 0.5), 2, 98);
+        const cat = scoreCategory(newScore);
+        setResult({
+          score: newScore,
+          category: cat,
+          wait: waitFromScore(newScore, venue.category),
+          queue: queueFromScore(newScore),
+        });
+        setPhase('result');
+      }, 500);
+      return () => clearTimeout(t);
+    }
+    const t = setTimeout(() => setStageIdx(i => i + 1), 950);
+    return () => clearTimeout(t);
+  }, [phase, stageIdx, venue]);
+
+  const startProcessing = () => { setPhase('processing'); setStageIdx(0); };
+  const finish = () => onComplete(venueId, result);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+      <div className="fade-in-up w-full max-w-lg bg-panel border border-hair rounded-lg overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-hair">
+          <div className="font-display font-semibold">Report crowd status</div>
+          <button onClick={onClose} className="text-mute hover:text-ink">✕</button>
+        </div>
+
+        <div className="p-5 flex flex-col gap-4">
+
+          {/* Video placeholder always visible for continuity */}
+          <ScanFrame>
+            <div className={`relative h-40 rounded-md bg-panel2 border border-hair overflow-hidden ${phase === 'processing' ? 'scanline' : ''}`}>
+              <div className="absolute inset-0 flex items-center justify-center text-mute text-sm">
+                {phase === 'form' && <span>📹 8s clip ready — {venue.name}</span>}
+                {phase === 'processing' && PIPELINE_STAGES[stageIdx] && PIPELINE_STAGES[stageIdx].key === 'blur' && (
+                  <span className="text-brand text-xs font-mono">redacting faces…</span>
+                )}
+              </div>
+              {phase === 'processing' && stageIdx >= 2 && stageIdx <= 3 && <DetectionBoxes />}
+            </div>
+          </ScanFrame>
+
+          {phase === 'form' && (
+            <React.Fragment>
+              <div>
+                <label className="text-xs text-mute block mb-1">Venue</label>
+                <select
+                  value={venueId}
+                  onChange={e => setVenueId(e.target.value)}
+                  className="w-full bg-panel2 border border-hair rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-brand"
+                >
+                  {venues.map(v => <option key={v.id} value={v.id}>{v.name} — {CATEGORY_META[v.category].label}</option>)}
+                </select>
+              </div>
+              <div className="text-xs text-mute bg-panel2 border border-hair rounded-md p-3 leading-relaxed">
+                Faces are detected and irreversibly blurred server-side before the clip is stored or analyzed — this happens regardless of any client-side blur.
+              </div>
+              <button onClick={startProcessing} className="w-full bg-brand text-base font-semibold text-sm py-2.5 rounded-md hover:brightness-110">
+                Simulate upload &amp; analyze
+              </button>
+            </React.Fragment>
+          )}
+
+          {phase === 'processing' && (
+            <div className="flex flex-col gap-2.5">
+              {PIPELINE_STAGES.map((s, i) => {
+                const done = i < stageIdx;
+                const active = i === stageIdx;
+                return (
+                  <div key={s.key} className={`flex items-start gap-3 transition-opacity ${i > stageIdx ? 'opacity-40' : 'opacity-100'}`}>
+                    <span className={`mt-0.5 w-5 h-5 rounded-full flex items-center justify-center text-[11px] shrink-0
+                      ${done ? 'bg-brand text-base' : active ? 'border-2 border-brand animate-pulse' : 'border border-hair'}`}>
+                      {done ? '✓' : ''}
+                    </span>
+                    <div>
+                      <div className={`text-sm font-medium ${active ? 'text-brand' : ''}`}>{s.label}</div>
+                      <div className="text-[11px] text-mute">{s.detail}</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {phase === 'result' && result && (
+            <div className="flex flex-col gap-4 fade-in-up">
+              <div className="flex items-center gap-4">
+                <div className="font-mono text-5xl font-bold" style={{ color: STATUS[result.category].color }}>{result.score}</div>
+                <div className="flex flex-col gap-1.5">
+                  <StatusPill category={result.category} />
+                  <span className="text-xs text-mute">Queue ~{result.queue} people · Wait ~{result.wait} min</span>
+                </div>
+              </div>
+              <div className="text-xs text-brand bg-brand/10 border border-brand/30 rounded-md px-3 py-2">
+                +10 points earned · report published to the live map
+              </div>
+              <button onClick={finish} className="w-full bg-brand text-base font-semibold text-sm py-2.5 rounded-md hover:brightness-110">
+                Done
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================== GAMIFICATION WIDGET ============================== */
+
+function GamificationWidget({ user, onToggle, open }) {
+  const level = levelFromPoints(user.points);
+  const floor = levelFloor(level), ceil = levelCeil(level);
+  const progress = clamp(((user.points - floor) / (ceil - floor)) * 100, 4, 100);
+
+  return (
+    <div className="relative">
+      <button onClick={onToggle} className="flex items-center gap-2.5 bg-panel border border-hair rounded-md pl-1.5 pr-3 py-1.5 hover:border-brand/50 transition">
+        <span className="w-7 h-7 rounded-full bg-gradient-to-br from-brand to-brand2 flex items-center justify-center font-mono text-xs font-bold text-base">
+          {level}
+        </span>
+        <span className="flex flex-col items-start leading-tight">
+          <span className="text-xs font-mono font-semibold">{user.points} pts</span>
+          <span className="w-24 h-1 rounded-full bg-hair overflow-hidden">
+            <span className="block h-full bg-brand" style={{ width: `${progress}%` }}></span>
+          </span>
+        </span>
+      </button>
+
+      {open && (
+        <div className="fade-in-up absolute right-0 mt-2 w-72 bg-panel border border-hair rounded-lg p-4 z-40 shadow-xl">
+          <div className="flex items-center justify-between mb-3">
+            <div className="font-display font-semibold text-sm">Contributor profile</div>
+            <span className="text-[11px] font-mono text-mute">Level {level}</span>
+          </div>
+          <div className="grid grid-cols-3 gap-2 mb-4">
+            <div className="bg-panel2 border border-hair rounded-md p-2 text-center">
+              <div className="font-mono text-base font-semibold">{user.points}</div>
+              <div className="text-[10px] text-mute">Points</div>
+            </div>
+            <div className="bg-panel2 border border-hair rounded-md p-2 text-center">
+              <div className="font-mono text-base font-semibold">{user.accuracy}</div>
+              <div className="text-[10px] text-mute">Accuracy</div>
+            </div>
+            <div className="bg-panel2 border border-hair rounded-md p-2 text-center">
+              <div className="font-mono text-base font-semibold">{user.uploads}</div>
+              <div className="text-[10px] text-mute">Reports</div>
+            </div>
+          </div>
+          <div className="text-[11px] text-mute mb-2">Badges</div>
+          <div className="grid grid-cols-3 gap-2">
+            {BADGE_DEFS.map(b => {
+              const unlocked = user.badges.includes(b.id);
+              return (
+                <div key={b.id} title={b.desc}
+                  className={`flex flex-col items-center gap-1 p-2 rounded-md border text-center
+                    ${unlocked ? 'border-brand2/50 bg-brand2/10' : 'border-hair bg-panel2 opacity-40'}`}>
+                  <span className="text-lg">{b.icon}</span>
+                  <span className="text-[9px] leading-tight">{b.label}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ============================== BUSINESS DASHBOARD ============================== */
+
+function HourlyChart({ hourly, peakHour }) {
+  const canvasRef = useRef(null);
+  const chartRef = useRef(null);
+
+  useEffect(() => {
+    if (chartRef.current) chartRef.current.destroy();
+    const ctx = canvasRef.current.getContext('2d');
+    chartRef.current = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: hourly.map((_, h) => `${h}:00`),
+        datasets: [{
+          data: hourly,
+          backgroundColor: hourly.map((_, h) => h === peakHour ? '#22D3C0' : '#243050'),
+          borderRadius: 3,
+          barPercentage: 0.7,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { backgroundColor: '#16203A', titleColor: '#E7ECF5', bodyColor: '#8C99B4' } },
+        scales: {
+          x: { ticks: { color: '#8C99B4', font: { size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 }, grid: { color: '#1B2740' } },
+          y: { ticks: { color: '#8C99B4', font: { size: 9 } }, grid: { color: '#1B2740' } },
+        }
+      }
+    });
+    return () => chartRef.current && chartRef.current.destroy();
+  }, [hourly, peakHour]);
+
+  return <div className="h-56"><canvas ref={canvasRef}></canvas></div>;
+}
+
+function BusinessDashboard({ venues, liveVenues }) {
+  const businesses = venues.filter(v => v.business);
+  const [bizId, setBizId] = useState(businesses[0].id);
+  const [threshold, setThreshold] = useState(75);
+  const biz = businesses.find(v => v.id === bizId);
+  const live = liveVenues.find(v => v.id === bizId);
+
+  const peakHour = biz.hourly.indexOf(Math.max(...biz.hourly));
+  const avgScore = Math.round(biz.hourly.reduce((a, b) => a + b, 0) / biz.hourly.length);
+  const avgWait = waitFromScore(avgScore, biz.category);
+  const totalReports = 140 + Math.round(avgScore * 1.3);
+  const overAlert = live && live.score >= threshold;
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-center gap-3">
+        <select
+          value={bizId}
+          onChange={e => setBizId(e.target.value)}
+          className="bg-panel border border-hair rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-brand"
+        >
+          {businesses.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+        </select>
+        <span className="text-[11px] text-mute font-mono">7-day rollup · claimed &amp; verified business</span>
+
+        <div className="ml-auto flex items-center gap-2 text-xs text-mute">
+          <span>Alert threshold</span>
+          <input type="range" min="40" max="100" value={threshold} onChange={e => setThreshold(+e.target.value)} className="accent-brand" />
+          <span className="font-mono text-ink">{threshold}</span>
+        </div>
+      </div>
+
+      {overAlert && (
+        <div className="fade-in-up bg-high/10 border border-high/40 text-high rounded-md px-3 py-2 text-sm flex items-center gap-2">
+          ⚠ Overcrowding alert — live crowd score for <b className="mx-1">{biz.name}</b> is {Math.round(live.score)}, at/above your {threshold} threshold.
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {[
+          { label: 'Avg crowd score (7d)', value: avgScore },
+          { label: 'Avg wait (min)', value: avgWait },
+          { label: 'Peak hour', value: `${peakHour}:00–${peakHour + 1}:00` },
+          { label: 'Total reports (7d)', value: totalReports },
+        ].map((kpi, i) => (
+          <ScanFrame key={i}>
+            <div className="bg-panel border border-hair rounded-md p-3">
+              <div className="text-[11px] text-mute mb-1">{kpi.label}</div>
+              <div className="font-mono text-xl font-semibold">{kpi.value}</div>
+            </div>
+          </ScanFrame>
+        ))}
+      </div>
+
+      <div className="bg-panel border border-hair rounded-lg p-4">
+        <div className="flex items-center justify-between mb-3">
+          <div className="font-display font-semibold text-sm">Hourly foot-traffic pattern</div>
+          <span className="text-[11px] font-mono text-brand">peak highlighted</span>
+        </div>
+        <HourlyChart hourly={biz.hourly} peakHour={peakHour} />
+      </div>
+
+      <div className="bg-panel border border-hair rounded-lg p-4 flex items-center justify-between text-sm">
+        <span className="text-mute">Export this range for your records</span>
+        <div className="flex gap-2">
+          <button className="px-3 py-1.5 rounded-md border border-hair text-xs hover:border-brand/50">Export CSV</button>
+          <button className="px-3 py-1.5 rounded-md border border-hair text-xs hover:border-brand/50">Export PDF summary</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================== TOASTS ============================== */
+
+function ToastStack({ toasts }) {
+  return (
+    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex flex-col gap-2 items-center">
+      {toasts.map(t => (
+        <div key={t.id} className="toast-in bg-panel2 border border-hair rounded-md px-4 py-2 text-sm shadow-lg">
+          {t.text}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ============================== ROOT APP ============================== */
+
+function App() {
+  const [venues, setVenues] = useState(INITIAL_VENUES);
+  const [tab, setTab] = useState('map');
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const [prefillId, setPrefillId] = useState(null);
+  const [gamiOpen, setGamiOpen] = useState(false);
+  const [toasts, setToasts] = useState([]);
+  const [user, setUser] = useState({
+    points: 260, accuracy: 78, uploads: 27,
+    badges: ['first_report', 'trusted', 'cafe_regular'],
+    sessionUploads: 0,
+  });
+
+  const pushToast = useCallback((text) => {
+    const id = uid();
+    setToasts(t => [...t, { id, text }]);
+    setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 3200);
+  }, []);
+
+  // simulated real-time decay of "freshness" + occasional ambient live report jitter
+  useEffect(() => {
+    const decay = setInterval(() => {
+      setVenues(vs => vs.map(v => ({ ...v, minsAgo: v.minsAgo + 2 })));
+    }, 3000);
+    const jitter = setInterval(() => {
+      setVenues(vs => {
+        const idx = Math.floor(Math.random() * vs.length);
+        const v = vs[idx];
+        const newScore = clamp(v.score + Math.round((Math.random() - 0.45) * 26), 2, 98);
+        const copy = [...vs];
+        copy[idx] = { ...v, score: newScore, minsAgo: 0, history: [...v.history.slice(-5), newScore] };
+        return copy;
+      });
+    }, 6000);
+    return () => { clearInterval(decay); clearInterval(jitter); };
+  }, []);
+
+  const openReport = (venueId) => { setPrefillId(venueId || null); setUploadOpen(true); };
+
+  const completeUpload = (venueId, result) => {
+    setVenues(vs => vs.map(v => v.id === venueId
+      ? { ...v, score: result.score, minsAgo: 0, history: [...v.history.slice(-5), result.score] }
+      : v));
+
+    const venue = venues.find(v => v.id === venueId);
+    setUser(u => {
+      const sessionUploads = u.sessionUploads + 1;
+      const newBadges = new Set(u.badges);
+      let unlocked = [];
+      if (venue.category === 'bank' && !newBadges.has('bank_beat')) { newBadges.add('bank_beat'); unlocked.push('Bank Beat'); }
+      if (sessionUploads >= 2 && !newBadges.has('rush_hour_hero')) { newBadges.add('rush_hour_hero'); unlocked.push('Rush Hour Hero'); }
+      unlocked.forEach(b => setTimeout(() => pushToast(`🏅 Badge unlocked: ${b}`), 400));
+      return {
+        ...u,
+        points: u.points + 10,
+        uploads: u.uploads + 1,
+        sessionUploads,
+        badges: Array.from(newBadges),
+      };
+    });
+
+    pushToast('+10 points · report published to the live map');
+    setUploadOpen(false);
+  };
+
+  return (
+    <div className="min-h-screen flex flex-col">
+      <header className="border-b border-hair bg-panel/60 backdrop-blur sticky top-0 z-30">
+        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center gap-6">
+          <div className="flex items-center gap-2">
+            <span className="w-7 h-7 rounded-md bg-gradient-to-br from-brand to-brand2 flex items-center justify-center text-base font-bold">◎</span>
+            <span className="font-display font-semibold tracking-tight">CrowdLens</span>
+            <span className="text-[10px] font-mono text-mute border border-hair rounded px-1.5 py-0.5">DEMO</span>
+          </div>
+
+          <nav className="flex gap-1 ml-2">
+            {[{ id: 'map', label: 'Live Map' }, { id: 'dashboard', label: 'Business Dashboard' }].map(t => (
+              <button
+                key={t.id}
+                onClick={() => setTab(t.id)}
+                className={`px-3 py-1.5 rounded-md text-sm font-medium transition
+                  ${tab === t.id ? 'bg-brand/15 text-brand' : 'text-mute hover:text-ink'}`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </nav>
+
+          <div className="ml-auto">
+            <GamificationWidget user={user} open={gamiOpen} onToggle={() => setGamiOpen(o => !o)} />
+          </div>
+        </div>
+      </header>
+
+      <main className="flex-1 max-w-6xl w-full mx-auto px-4 py-5">
+        {tab === 'map'
+          ? <MapView venues={venues} onReport={openReport} />
+          : <BusinessDashboard venues={venues} liveVenues={venues} />
+        }
+      </main>
+
+      <button
+        onClick={() => openReport(null)}
+        className="fixed bottom-6 right-6 z-40 bg-brand text-base font-semibold text-sm px-4 py-3 rounded-full shadow-xl hover:brightness-110 flex items-center gap-2"
+      >
+        <span className="text-lg leading-none">＋</span> Report crowd
+      </button>
+
+      {uploadOpen && (
+        <UploadModal
+          venues={venues}
+          prefillId={prefillId}
+          onClose={() => setUploadOpen(false)}
+          onComplete={completeUpload}
+        />
+      )}
+
+      <ToastStack toasts={toasts} />
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
