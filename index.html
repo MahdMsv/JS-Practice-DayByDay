@@ -214,7 +214,6 @@
       render();
     }
 
-    // افزودن تسک
     async function handleAdd() {
       const text = DOM.input.value.trim();
       if (!text) return;
@@ -245,7 +244,6 @@
     DOM.addBtn.addEventListener("click", handleAdd);
     DOM.list.addEventListener("click", handleDelete);
 
-    // شروع برنامه
     initApp();
   </script>
 </html>
