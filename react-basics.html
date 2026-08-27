@@ -1,0 +1,30 @@
+<!doctype html>
+<html>
+  <head>
+    <title>React Basics</title>
+  </head>
+  <body>
+    <div class="js-container"></div>
+
+    <script src="https://unpkg.com/supersimpledev/react.js"></script>
+    <script src="https://unpkg.com/supersimpledev/react-dom.js"></script>
+
+    <script src="https://unpkg.com/supersimpledev/babel.js"></script>
+    <script type="text/babel">
+      const name = "mahdi";
+      function NewComp(prop) {
+        return (
+          <>
+            <div>Hi My name is {name}</div>
+            <p>
+              {name} is from AFG , his favorite color is {prop.color}
+            </p>
+          </>
+        );
+      }
+
+      const container = document.querySelector(".js-container");
+      ReactDOM.createRoot(container).render(<NewComp color="red" />);
+    </script>
+  </body>
+</html>
