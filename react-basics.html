@@ -12,19 +12,19 @@
     <script src="https://unpkg.com/supersimpledev/babel.js"></script>
     <script type="text/babel">
       const name = "mahdi";
-      function NewComp(prop) {
+      function NewComp() {
+        const shoot = () => {
+          alert("Great Shot");
+        };
+
         return (
           <>
-            <div>Hi My name is {name}</div>
-            <p>
-              {name} is from AFG , his favorite color is {prop.color}
-            </p>
+            <button onClick={shoot}>take the shot !</button>
           </>
         );
       }
-
       const container = document.querySelector(".js-container");
-      ReactDOM.createRoot(container).render(<NewComp color="red" />);
+      ReactDOM.createRoot(container).render(<NewComp />);
     </script>
   </body>
 </html>
