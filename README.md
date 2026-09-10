@@ -1,10 +1,10 @@
-# My Learning Journey 🚀
+# My Learning Journey 
 
-## ✅ JavaScript Practice
-All done successfully. 🎉
+## JavaScript Practice
+All done successfully. 
 
-## ⚛️ React.js Practice
-Has started... 🚧
+## React.js Practice
+Has started... 
 
 ---
 
